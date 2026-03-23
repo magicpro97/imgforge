@@ -2,14 +2,6 @@
   "hosting": {
     "target": "imgforge",
     "public": "public",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "headers": [
-      {
-        "source": "**/*.@(js|css|svg|png|ico|webp)",
-        "headers": [
-          { "key": "Cache-Control", "value": "max-age=31536000, immutable" }
-        ]
-      }
-    ]
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
   }
 }
