@@ -1,6 +1,6 @@
 {
   "name": "imgforge",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "🎨 AI Image Generator CLI - Multi-provider, multi-model image generation from your terminal",
   "main": "dist/index.js",
   "type": "module",
@@ -18,7 +18,7 @@
     "dev": "tsc && node dist/index.js",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["ai", "image", "generator", "cli", "dalle", "gemini", "stable-diffusion", "flux", "openai", "replicate", "pollinations", "stability-ai"],
+  "keywords": ["ai", "image", "generator", "cli", "dalle", "gemini", "nano-banana", "imagen-4", "stable-diffusion", "flux", "openai", "replicate", "pollinations", "stability-ai"],
   "author": "magicpro97",
   "license": "MIT",
   "repository": {

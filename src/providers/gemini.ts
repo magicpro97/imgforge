@@ -5,14 +5,27 @@ export class GeminiProvider extends ImageProvider {
   private apiKey: string = '';
   private baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
 
+  // Nano Banana models use IMAGE-only responseModalities for better results
+  private nanoBananaModels = new Set([
+    'gemini-2.5-flash-image',
+    'gemini-3.1-flash-image-preview',
+  ]);
+
   get info(): ProviderInfo {
     return {
       name: 'gemini',
-      displayName: 'Google Gemini (Imagen)',
-      description: 'Gemini Flash Image, Imagen 3/4 from Google',
+      displayName: 'Google Gemini (Nano Banana / Imagen)',
+      description: 'Nano Banana 2, Gemini Flash Image, Imagen 4/3 from Google DeepMind',
       requiresKey: true,
       website: 'https://ai.google.dev/',
-      models: ['gemini-2.0-flash-preview-image-generation', 'imagen-3.0-generate-002'],
+      models: [
+        'gemini-2.5-flash-image',               // Nano Banana — best balance
+        'gemini-3.1-flash-image-preview',        // Nano Banana 2 — latest & most powerful
+        'gemini-2.0-flash-preview-image-generation', // Legacy Gemini Flash
+        'imagen-4.0-generate-001',               // Imagen 4 — high fidelity
+        'imagen-4.0-ultra-generate-001',         // Imagen 4 Ultra — maximum quality
+        'imagen-3.0-generate-002',               // Imagen 3
+      ],
     };
   }
 
@@ -39,7 +52,7 @@ export class GeminiProvider extends ImageProvider {
     if (!this.apiKey) throw new Error('Gemini API key not configured. Run: imgforge config set gemini.apiKey <key>');
 
     const startTime = Date.now();
-    const model = request.model || 'gemini-2.0-flash-preview-image-generation';
+    const model = request.model || 'gemini-2.5-flash-image';
 
     if (model.startsWith('imagen')) {
       return this.generateWithImagen(request, model, startTime);
@@ -55,12 +68,19 @@ export class GeminiProvider extends ImageProvider {
   ): Promise<ImageGenerationResult> {
     const url = `${this.baseUrl}/models/${model}:generateContent?key=${this.apiKey}`;
 
-    const body = {
+    // Nano Banana models work best with IMAGE-only modality
+    const isNanoBanana = this.nanoBananaModels.has(model);
+    const responseModalities = isNanoBanana ? ['IMAGE'] : ['TEXT', 'IMAGE'];
+
+    const body: Record<string, unknown> = {
       contents: [{
         parts: [{ text: request.prompt }],
       }],
       generationConfig: {
-        responseModalities: ['TEXT', 'IMAGE'],
+        responseModalities,
+        ...(isNanoBanana && request.width && request.height
+          ? { imageConfig: { aspectRatio: this.getAspectRatio(request.width, request.height) } }
+          : {}),
       },
     };
 

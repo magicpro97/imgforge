@@ -4,7 +4,7 @@ Multi-provider, multi-model AI image generation from your terminal.
 
 ## Features
 
-- **5 Providers**: OpenAI (DALL-E 3), Google Gemini (Imagen), Stability AI (SD3/SDXL), Replicate (Flux), Pollinations (Free)
+- **5 Providers**: OpenAI (DALL-E 3), Google Gemini (Nano Banana, Imagen 4), Stability AI (SD3/SDXL), Replicate (Flux), Pollinations (Free)
 - **Simple CLI**: `imgforge generate "your prompt"` → saves image to disk
 - **Interactive Mode**: Menu-driven UI for step-by-step generation
 - **Multi-model**: Switch between models with `-m` flag
@@ -47,7 +47,8 @@ imgforge generate "a futuristic cityscape"
 
 # Choose provider and model
 imgforge generate "portrait photo" -p openai -m dall-e-3
-imgforge generate "anime girl" -p gemini -m gemini-2.0-flash-preview-image-generation
+imgforge generate "anime girl" -p gemini -m gemini-2.5-flash-image
+imgforge generate "ultra realistic portrait" -p gemini -m gemini-3.1-flash-image-preview
 imgforge generate "landscape" -p stability -m sd3-large
 imgforge generate "abstract art" -p replicate -m black-forest-labs/flux-1.1-pro
 
@@ -125,7 +126,7 @@ imgforge i
 | Provider | Models | API Key | Free Tier | Website |
 |----------|--------|---------|-----------|---------|
 | **OpenAI** | DALL-E 3, DALL-E 2, gpt-image-1 | Required | $5 credit | [platform.openai.com](https://platform.openai.com/api-keys) |
-| **Gemini** | Gemini Flash Image, Imagen 3 | Required | Free tier | [ai.google.dev](https://ai.google.dev/) |
+| **Gemini** | Nano Banana 2, Gemini Flash Image, Imagen 4/3 | Required | Free tier | [ai.google.dev](https://ai.google.dev/) |
 | **Stability** | SD3, SDXL, Stable Image | Required | 25 credits | [platform.stability.ai](https://platform.stability.ai/account/keys) |
 | **Replicate** | Flux 1.1 Pro, Flux Schnell, SDXL | Required | Free tier | [replicate.com](https://replicate.com/account/api-tokens) |
 | **Pollinations** | Flux, Flux Realism, Turbo | **Not needed** | **Unlimited free** | [pollinations.ai](https://pollinations.ai/) |
@@ -157,7 +158,7 @@ Stored at `~/.imgforge/config.json`:
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 20+
 
 ## License
 
