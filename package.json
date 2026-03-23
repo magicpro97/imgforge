@@ -7,14 +7,28 @@
   "bin": {
     "imgforge": "dist/index.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "tsc && node dist/index.js"
+    "dev": "tsc && node dist/index.js",
+    "prepublishOnly": "npm run build"
   },
-  "keywords": ["ai", "image", "generator", "cli", "dalle", "gemini", "stable-diffusion", "flux"],
-  "author": "",
+  "keywords": ["ai", "image", "generator", "cli", "dalle", "gemini", "stable-diffusion", "flux", "openai", "replicate", "pollinations", "stability-ai"],
+  "author": "magicpro97",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/magicpro97/imgforge.git"
+  },
+  "homepage": "https://github.com/magicpro97/imgforge#readme",
+  "bugs": {
+    "url": "https://github.com/magicpro97/imgforge/issues"
+  },
   "dependencies": {
     "chalk": "^5.6.2",
     "commander": "^14.0.3",
