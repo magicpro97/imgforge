@@ -11,6 +11,27 @@ export interface ImageGenerationRequest {
   format?: 'png' | 'jpg' | 'webp';
 }
 
+export interface ImageEditRequest extends ImageGenerationRequest {
+  inputImage: string;   // file path to source image
+  mask?: string;        // file path to mask (transparent = edit area)
+  strength?: number;    // 0.0-1.0, how much to change (img2img)
+}
+
+export interface ImageUpscaleRequest {
+  inputImage: string;   // file path
+  scale?: '2x' | '4x';
+  prompt?: string;      // creative guidance for upscaling
+  creativity?: number;  // 0.0-1.0
+  format?: 'png' | 'jpg' | 'webp';
+}
+
+export interface ImageVariationRequest {
+  inputImage: string;
+  count?: number;
+  strength?: number;    // how different from original
+  prompt?: string;      // optional guidance
+}
+
 export interface GeneratedImage {
   url?: string;
   base64?: string;
@@ -34,4 +55,12 @@ export interface ProviderInfo {
   requiresKey: boolean;
   website: string;
   models: string[];
+  capabilities?: ProviderCapabilities;
+}
+
+export interface ProviderCapabilities {
+  edit?: boolean;
+  upscale?: boolean;
+  removeBackground?: boolean;
+  variations?: boolean;
 }

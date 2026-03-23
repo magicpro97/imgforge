@@ -75,3 +75,32 @@ historyCommand
     clearHistory();
     console.log(chalk.green('  ✓ History cleared'));
   });
+
+historyCommand
+  .command('redo <id>')
+  .description('Re-run a past generation (optionally with changes)')
+  .option('-p, --provider <name>', 'Override provider')
+  .option('-m, --model <model>', 'Override model')
+  .option('--prompt <text>', 'Override prompt')
+  .option('-o, --output <path>', 'Output file path')
+  .action(async (id: string, options: any) => {
+    const chalk = (await import('chalk')).default;
+    const entry = getHistoryEntry(id);
+    if (!entry) {
+      console.log(chalk.red(`  ✗ Entry "${id}" not found`));
+      return;
+    }
+    // Dynamically import generate command
+    const { generateCommand: genCmd } = await import('./generate.js');
+    const prompt = options.prompt || entry.prompt;
+    await genCmd(prompt, {
+      provider: options.provider || entry.provider,
+      model: options.model || entry.model,
+      width: String(entry.width),
+      height: String(entry.height),
+      quality: entry.quality,
+      output: options.output,
+      negative: entry.negativePrompt,
+      count: '1',
+    });
+  });

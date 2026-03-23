@@ -3,6 +3,9 @@ export interface AppConfig {
   defaults: DefaultsConfig;
   history: HistoryConfig;
   output: OutputConfig;
+  cost: CostConfig;
+  autoOpen: boolean;
+  plugins: string[];
 }
 
 export interface ProviderConfig {
@@ -20,6 +23,7 @@ export interface DefaultsConfig {
   quality: 'standard' | 'hd' | 'ultra';
   format: 'png' | 'jpg' | 'webp';
   count: number;
+  preset: string;
 }
 
 export interface OutputConfig {
@@ -30,6 +34,12 @@ export interface OutputConfig {
 export interface HistoryConfig {
   enabled: boolean;
   maxEntries: number;
+}
+
+export interface CostConfig {
+  budget: number;
+  currency: string;
+  trackingEnabled: boolean;
 }
 
 export interface HistoryEntry {
@@ -45,4 +55,16 @@ export interface HistoryEntry {
   outputFiles: string[];
   elapsed: number;
   cost?: number;
+}
+
+export interface TemplateEntry {
+  name: string;
+  prompt: string;
+  variables: string[];
+  provider?: string;
+  model?: string;
+  width?: number;
+  height?: number;
+  quality?: string;
+  negativePrompt?: string;
 }

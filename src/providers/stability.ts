@@ -1,5 +1,6 @@
+import * as fs from 'node:fs';
 import { ImageProvider } from './base.js';
-import type { ImageGenerationRequest, ImageGenerationResult, ProviderInfo } from '../types/index.js';
+import type { ImageGenerationRequest, ImageGenerationResult, ImageEditRequest, ImageUpscaleRequest, ProviderInfo } from '../types/index.js';
 
 export class StabilityProvider extends ImageProvider {
   private apiKey: string = '';
@@ -13,6 +14,7 @@ export class StabilityProvider extends ImageProvider {
       requiresKey: true,
       website: 'https://platform.stability.ai/account/keys',
       models: ['sd3-large', 'sd3-medium', 'sd3-large-turbo', 'stable-image-core', 'stable-image-ultra'],
+      capabilities: { edit: true, upscale: true, removeBackground: true },
     };
   }
 
@@ -110,5 +112,98 @@ export class StabilityProvider extends ImageProvider {
 
   async listModels(): Promise<string[]> {
     return this.info.models;
+  }
+
+  async edit(request: ImageEditRequest): Promise<ImageGenerationResult> {
+    if (!this.apiKey) throw new Error('Stability API key not configured');
+    const startTime = Date.now();
+
+    const formData = new FormData();
+    const imageBuffer = fs.readFileSync(request.inputImage);
+    formData.append('image', new Blob([imageBuffer]), 'image.png');
+    formData.append('prompt', request.prompt);
+    if (request.negativePrompt) formData.append('negative_prompt', request.negativePrompt);
+    if (request.strength !== undefined) formData.append('strength', String(request.strength));
+    formData.append('output_format', request.format || 'png');
+
+    const response = await fetch(`${this.baseUrl}/stable-image/edit/search-and-replace`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${this.apiKey}`, Accept: 'application/json' },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(`Stability edit error (${response.status}): ${(err as any)?.message || response.statusText}`);
+    }
+
+    const data: any = await response.json();
+    return {
+      images: [{ base64: data.image }],
+      provider: 'stability', model: 'search-and-replace',
+      elapsed: Date.now() - startTime, metadata: { seed: data.seed },
+    };
+  }
+
+  async upscale(request: ImageUpscaleRequest): Promise<ImageGenerationResult> {
+    if (!this.apiKey) throw new Error('Stability API key not configured');
+    const startTime = Date.now();
+
+    const formData = new FormData();
+    const imageBuffer = fs.readFileSync(request.inputImage);
+    formData.append('image', new Blob([imageBuffer]), 'image.png');
+    if (request.prompt) formData.append('prompt', request.prompt);
+    formData.append('output_format', request.format || 'png');
+    if (request.creativity !== undefined) formData.append('creativity', String(request.creativity));
+
+    const endpoint = request.prompt
+      ? `${this.baseUrl}/stable-image/upscale/creative`
+      : `${this.baseUrl}/stable-image/upscale/conservative`;
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${this.apiKey}`, Accept: 'application/json' },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(`Stability upscale error (${response.status}): ${(err as any)?.message || response.statusText}`);
+    }
+
+    const data: any = await response.json();
+    return {
+      images: [{ base64: data.image }],
+      provider: 'stability', model: request.prompt ? 'creative-upscale' : 'conservative-upscale',
+      elapsed: Date.now() - startTime, metadata: {},
+    };
+  }
+
+  async removeBackground(inputImage: string): Promise<ImageGenerationResult> {
+    if (!this.apiKey) throw new Error('Stability API key not configured');
+    const startTime = Date.now();
+
+    const formData = new FormData();
+    const imageBuffer = fs.readFileSync(inputImage);
+    formData.append('image', new Blob([imageBuffer]), 'image.png');
+    formData.append('output_format', 'png');
+
+    const response = await fetch(`${this.baseUrl}/stable-image/edit/remove-background`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${this.apiKey}`, Accept: 'application/json' },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(`Stability remove-bg error (${response.status}): ${(err as any)?.message || response.statusText}`);
+    }
+
+    const data: any = await response.json();
+    return {
+      images: [{ base64: data.image }],
+      provider: 'stability', model: 'remove-background',
+      elapsed: Date.now() - startTime, metadata: {},
+    };
   }
 }

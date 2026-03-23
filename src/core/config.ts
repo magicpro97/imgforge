@@ -22,6 +22,7 @@ const DEFAULT_CONFIG: AppConfig = {
     quality: 'standard',
     format: 'png',
     count: 1,
+    preset: '',
   },
   history: {
     enabled: true,
@@ -31,6 +32,13 @@ const DEFAULT_CONFIG: AppConfig = {
     directory: './imgforge-output',
     namingPattern: '{provider}-{model}-{timestamp}',
   },
+  cost: {
+    budget: 0,
+    currency: 'USD',
+    trackingEnabled: true,
+  },
+  autoOpen: false,
+  plugins: [],
 };
 
 function ensureConfigDir(): void {

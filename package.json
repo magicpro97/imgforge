@@ -1,6 +1,6 @@
 {
   "name": "imgforge",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "🎨 AI Image Generator CLI - Multi-provider, multi-model image generation from your terminal",
   "main": "dist/index.js",
   "type": "module",

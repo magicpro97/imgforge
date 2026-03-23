@@ -1,5 +1,6 @@
+import * as fs from 'node:fs';
 import { ImageProvider } from './base.js';
-import type { ImageGenerationRequest, ImageGenerationResult, ProviderInfo } from '../types/index.js';
+import type { ImageGenerationRequest, ImageGenerationResult, ImageEditRequest, ImageVariationRequest, ProviderInfo } from '../types/index.js';
 
 export class OpenAIProvider extends ImageProvider {
   private apiKey: string = '';
@@ -13,6 +14,7 @@ export class OpenAIProvider extends ImageProvider {
       requiresKey: true,
       website: 'https://platform.openai.com/api-keys',
       models: ['dall-e-3', 'dall-e-2', 'gpt-image-1'],
+      capabilities: { edit: true, variations: true },
     };
   }
 
@@ -99,5 +101,69 @@ export class OpenAIProvider extends ImageProvider {
 
   async listModels(): Promise<string[]> {
     return this.info.models;
+  }
+
+  async edit(request: ImageEditRequest): Promise<ImageGenerationResult> {
+    if (!this.apiKey) throw new Error('OpenAI API key not configured');
+    const startTime = Date.now();
+    const model = request.model || 'gpt-image-1';
+
+    const formData = new FormData();
+    const imageBuffer = fs.readFileSync(request.inputImage);
+    formData.append('image', new Blob([imageBuffer]), 'image.png');
+    if (request.mask) {
+      const maskBuffer = fs.readFileSync(request.mask);
+      formData.append('mask', new Blob([maskBuffer]), 'mask.png');
+    }
+    formData.append('prompt', request.prompt);
+    formData.append('model', model);
+    formData.append('response_format', 'b64_json');
+    formData.append('n', '1');
+
+    const response = await fetch(`${this.baseUrl}/images/edits`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${this.apiKey}` },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(`OpenAI edit error (${response.status}): ${(err as any)?.error?.message || response.statusText}`);
+    }
+
+    const data: any = await response.json();
+    return {
+      images: data.data.map((img: any) => ({ base64: img.b64_json, revisedPrompt: img.revised_prompt })),
+      provider: 'openai', model, elapsed: Date.now() - startTime, metadata: {},
+    };
+  }
+
+  async vary(request: ImageVariationRequest): Promise<ImageGenerationResult> {
+    if (!this.apiKey) throw new Error('OpenAI API key not configured');
+    const startTime = Date.now();
+
+    const formData = new FormData();
+    const imageBuffer = fs.readFileSync(request.inputImage);
+    formData.append('image', new Blob([imageBuffer]), 'image.png');
+    formData.append('model', 'dall-e-2');
+    formData.append('n', String(Math.min(request.count || 4, 4)));
+    formData.append('response_format', 'b64_json');
+
+    const response = await fetch(`${this.baseUrl}/images/variations`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${this.apiKey}` },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(`OpenAI variation error (${response.status}): ${(err as any)?.error?.message || response.statusText}`);
+    }
+
+    const data: any = await response.json();
+    return {
+      images: data.data.map((img: any) => ({ base64: img.b64_json })),
+      provider: 'openai', model: 'dall-e-2', elapsed: Date.now() - startTime, metadata: {},
+    };
   }
 }

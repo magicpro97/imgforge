@@ -1,5 +1,6 @@
+import * as fs from 'node:fs';
 import { ImageProvider } from './base.js';
-import type { ImageGenerationRequest, ImageGenerationResult, ProviderInfo } from '../types/index.js';
+import type { ImageGenerationRequest, ImageGenerationResult, ImageEditRequest, ProviderInfo } from '../types/index.js';
 
 export class GeminiProvider extends ImageProvider {
   private apiKey: string = '';
@@ -26,6 +27,7 @@ export class GeminiProvider extends ImageProvider {
         'imagen-4.0-ultra-generate-001',         // Imagen 4 Ultra — maximum quality
         'imagen-3.0-generate-002',               // Imagen 3
       ],
+      capabilities: { edit: true },
     };
   }
 
@@ -180,5 +182,57 @@ export class GeminiProvider extends ImageProvider {
 
   async listModels(): Promise<string[]> {
     return this.info.models;
+  }
+
+  async edit(request: ImageEditRequest): Promise<ImageGenerationResult> {
+    if (!this.apiKey) throw new Error('Gemini API key not configured');
+    const startTime = Date.now();
+    const model = request.model || 'gemini-2.5-flash-image';
+
+    const imageBuffer = fs.readFileSync(request.inputImage);
+    const imageBase64 = imageBuffer.toString('base64');
+    const mimeType = request.inputImage.endsWith('.png') ? 'image/png' : 'image/jpeg';
+
+    const url = `${this.baseUrl}/models/${model}:generateContent?key=${this.apiKey}`;
+    const body = {
+      contents: [{
+        parts: [
+          { text: request.prompt },
+          { inlineData: { mimeType, data: imageBase64 } },
+        ],
+      }],
+      generationConfig: {
+        responseModalities: ['IMAGE'],
+      },
+    };
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(`Gemini edit error (${response.status}): ${(err as any)?.error?.message || response.statusText}`);
+    }
+
+    const data: any = await response.json();
+    const images: Array<{ base64?: string }> = [];
+
+    for (const candidate of data.candidates || []) {
+      for (const part of candidate.content?.parts || []) {
+        if (part.inlineData?.mimeType?.startsWith('image/')) {
+          images.push({ base64: part.inlineData.data });
+        }
+      }
+    }
+
+    if (images.length === 0) throw new Error('Gemini returned no images for edit');
+
+    return {
+      images, provider: 'gemini', model,
+      elapsed: Date.now() - startTime, metadata: {},
+    };
   }
 }
