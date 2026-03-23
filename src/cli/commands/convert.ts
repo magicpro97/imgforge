@@ -36,13 +36,36 @@ export async function convertCommand(input: string, options: ConvertOptions): Pr
     return;
   }
 
-  // Copy with new extension (basic — real conversion needs sharp)
-  const outDir = path.dirname(outputPath);
-  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
-  fs.copyFileSync(input, outputPath);
+  // Try sharp for real conversion, fall back to warning
+  try {
+    // Dynamic import — sharp is optional
+    const sharpModule = await import(/* webpackIgnore: true */ 'sharp' as string);
+    const sharp = sharpModule.default;
+    const outDir = path.dirname(outputPath);
+    if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
-  console.log(chalk.bold('\n  🔄 ImgForge - Format Convert'));
-  console.log(chalk.green(`  ✓ ${input} → ${outputPath}`));
-  console.log(chalk.dim(`  Note: For full format conversion (resize, quality), install sharp: npm i sharp`));
-  console.log('');
+    let pipeline = sharp(buffer);
+    if (options.width || options.height) {
+      pipeline = pipeline.resize(
+        options.width ? parseInt(options.width) : undefined,
+        options.height ? parseInt(options.height) : undefined,
+      );
+    }
+    const quality = options.quality ? parseInt(options.quality) : undefined;
+    if (targetFormat === 'webp') pipeline = pipeline.webp({ quality });
+    else if (targetFormat === 'png') pipeline = pipeline.png();
+    else if (targetFormat === 'jpg' || targetFormat === 'jpeg') pipeline = pipeline.jpeg({ quality });
+    else if (targetFormat === 'avif') pipeline = pipeline.avif({ quality });
+
+    await pipeline.toFile(outputPath);
+    console.log(chalk.bold('\n  🔄 ImgForge - Format Convert'));
+    console.log(chalk.green(`  ✓ ${input} → ${outputPath}`));
+    console.log('');
+  } catch {
+    console.error(chalk.red('\n  ✗ Format conversion requires the "sharp" package.'));
+    console.error(chalk.dim('    Install it with: npm install sharp'));
+    console.error(chalk.dim('    Then retry: imgforge convert ' + input + ' --to ' + targetFormat));
+    console.log('');
+    process.exit(1);
+  }
 }

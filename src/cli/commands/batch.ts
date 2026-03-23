@@ -101,9 +101,11 @@ export async function batchCommand(file: string, options: { dryRun?: boolean; pa
     let prompt = img.prompt;
     if (presetName) prompt = applyPreset(prompt, presetName);
 
-    const outputPath = img.output || defaults.output
-      ? path.resolve(img.output || `${defaults.output}/${img.name}.png`)
-      : undefined;
+    const outputPath = img.output
+      ? path.resolve(img.output)
+      : defaults.output
+        ? path.resolve(`${defaults.output}/${img.name}.png`)
+        : undefined;
 
     const cost = estimateCost(providerName, modelName, { quality, width, height }) * (img.count || 1);
     totalCost += cost;

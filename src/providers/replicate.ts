@@ -72,13 +72,21 @@ export class ReplicateProvider extends ImageProvider {
 
     let prediction: any = await createResponse.json();
 
-    // Poll for completion if not using Prefer: wait
+    // Poll for completion with timeout (max 5 minutes)
+    const maxAttempts = 300;
+    let attempts = 0;
     while (prediction.status === 'starting' || prediction.status === 'processing') {
+      if (++attempts > maxAttempts) {
+        throw new Error('Replicate generation timed out after 5 minutes');
+      }
       await new Promise(resolve => setTimeout(resolve, 1000));
       const pollResponse = await fetch(prediction.urls.get, {
         headers: { Authorization: `Bearer ${this.apiKey}` },
       });
-      prediction = await pollResponse.json();
+      prediction = await pollResponse.json().catch(() => ({
+        status: 'failed',
+        error: 'Invalid response from Replicate API',
+      }));
     }
 
     if (prediction.status === 'failed') {
