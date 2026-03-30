@@ -117,6 +117,7 @@ program
   .description('Generate multiple images from a YAML/JSON config file')
   .option('--dry-run', 'Preview without generating')
   .option('--parallel <number>', 'Concurrent generations')
+  .option('--delay <ms>', 'Delay between requests in ms (default: auto-detect from provider)')
   .action(batchCommand);
 
 // Convert

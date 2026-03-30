@@ -8,6 +8,7 @@ import { addHistoryEntry } from '../../core/history.js';
 import { estimateCost } from '../../core/pricing.js';
 import { applyPreset } from '../../core/presets.js';
 import { resolveRatio } from '../../core/ratios.js';
+import { withRetry, RateLimiter, type RetryResult } from '@magicpro97/forge-core';
 
 interface BatchImage {
   name: string;
@@ -39,7 +40,7 @@ interface BatchConfig {
   images: BatchImage[];
 }
 
-export async function batchCommand(file: string, options: { dryRun?: boolean; parallel?: string }): Promise<void> {
+export async function batchCommand(file: string, options: { dryRun?: boolean; parallel?: string; delay?: string }): Promise<void> {
   const chalk = (await import('chalk')).default;
   const ora = (await import('ora')).default;
 
@@ -68,7 +69,20 @@ export async function batchCommand(file: string, options: { dryRun?: boolean; pa
   const total = batch.images.length;
   let totalCost = 0;
 
+  // Set up rate limiter based on --delay or provider defaults
+  const defaultProvider = batch.defaults?.provider || config.defaults.provider;
+  const delayMs = options.delay ? parseInt(options.delay, 10) : undefined;
+  // For Replicate: auto-limit to 6 req/min (10s intervals) to avoid 429s on low-credit accounts
+  const isReplicate = defaultProvider === 'replicate';
+  const requestsPerMinute = delayMs ? (60000 / delayMs) : (isReplicate ? 6 : 30);
+  const rateLimiter = new RateLimiter(requestsPerMinute);
+
   console.log(chalk.bold(`\n  📦 Batch Processing: ${total} images`));
+  if (isReplicate && !delayMs) {
+    console.log(chalk.dim(`  ⏱  Rate limited to ${requestsPerMinute} req/min (Replicate)`));
+  } else if (delayMs) {
+    console.log(chalk.dim(`  ⏱  Delay: ${delayMs}ms between requests`));
+  }
   if (options.dryRun) console.log(chalk.yellow('  (dry run — no images will be generated)\n'));
   else console.log('');
 
@@ -127,16 +141,28 @@ export async function batchCommand(file: string, options: { dryRun?: boolean; pa
       if (apiKey) provider.configure(apiKey);
       else if (provider.info.requiresKey) throw new Error(`No API key for ${providerName}`);
 
-      const result = await provider.generate({
-        prompt,
-        model: modelName || undefined,
-        width,
-        height,
-        quality: quality as any,
-        negativePrompt: negative,
-        count: img.count || 1,
-      });
+      await rateLimiter.acquire();
 
+      const retryResult: RetryResult<any> = await withRetry(
+        () => provider.generate({
+          prompt,
+          model: modelName || undefined,
+          width,
+          height,
+          quality: quality as any,
+          negativePrompt: negative,
+          count: img.count || 1,
+        }),
+        {
+          maxRetries: 3,
+          baseDelayMs: isReplicate ? 10000 : 1000,
+          onRetry: (attempt, delayMs, error) => {
+            spinner.text = `${img.name} — retry ${attempt}/3 (waiting ${(delayMs / 1000).toFixed(1)}s)...`;
+          },
+        },
+      );
+
+      const result = retryResult.data;
       result.cost = cost;
       const saveResult = saveImages(result, outputPath);
 
