@@ -1,9 +1,9 @@
 import { ImageProvider } from './base.js';
+import { replicateRunModel, replicateDownloadOutput, replicateValidateApiKey } from '@magicpro97/forge-core';
 import type { ImageGenerationRequest, ImageGenerationResult, ProviderInfo } from '../types/index.js';
 
 export class ReplicateProvider extends ImageProvider {
   private apiKey: string = '';
-  private baseUrl = 'https://api.replicate.com/v1';
 
   get info(): ProviderInfo {
     return {
@@ -26,14 +26,7 @@ export class ReplicateProvider extends ImageProvider {
 
   async validate(): Promise<boolean> {
     if (!this.apiKey) return false;
-    try {
-      const response = await fetch(`${this.baseUrl}/models`, {
-        headers: { Authorization: `Bearer ${this.apiKey}` },
-      });
-      return response.ok;
-    } catch {
-      return false;
-    }
+    return replicateValidateApiKey({ apiKey: this.apiKey });
   }
 
   async generate(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
@@ -45,64 +38,27 @@ export class ReplicateProvider extends ImageProvider {
     const w = request.width || 1024;
     const h = request.height || 1024;
 
-    // Create prediction
-    const createResponse = await fetch(`${this.baseUrl}/models/${model}/predictions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-        Prefer: 'wait',
+    const prediction = await replicateRunModel(
+      { apiKey: this.apiKey },
+      model,
+      {
+        prompt: request.prompt,
+        width: w,
+        height: h,
+        num_outputs: request.count || 1,
+        ...(request.seed !== undefined ? { seed: request.seed } : {}),
       },
-      body: JSON.stringify({
-        input: {
-          prompt: request.prompt,
-          width: w,
-          height: h,
-          num_outputs: request.count || 1,
-          ...(request.seed !== undefined ? { seed: request.seed } : {}),
-        },
-      }),
-    });
-
-    if (!createResponse.ok) {
-      const errorData = await createResponse.json().catch(() => ({}));
-      const msg = (errorData as any)?.detail || createResponse.statusText;
-      throw new Error(`Replicate API error (${createResponse.status}): ${msg}`);
-    }
-
-    let prediction: any = await createResponse.json();
-
-    // Poll for completion with timeout (max 5 minutes)
-    const maxAttempts = 300;
-    let attempts = 0;
-    while (prediction.status === 'starting' || prediction.status === 'processing') {
-      if (++attempts > maxAttempts) {
-        throw new Error('Replicate generation timed out after 5 minutes');
-      }
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const pollResponse = await fetch(prediction.urls.get, {
-        headers: { Authorization: `Bearer ${this.apiKey}` },
-      });
-      prediction = await pollResponse.json().catch(() => ({
-        status: 'failed',
-        error: 'Invalid response from Replicate API',
-      }));
-    }
-
-    if (prediction.status === 'failed') {
-      throw new Error(`Replicate generation failed: ${prediction.error || 'Unknown error'}`);
-    }
+    );
 
     const elapsed = Date.now() - startTime;
     const output = Array.isArray(prediction.output) ? prediction.output : [prediction.output];
 
     // Download images
     const images = await Promise.all(
-      output.filter(Boolean).map(async (url: string) => {
+      (output as string[]).filter(Boolean).map(async (url: string) => {
         try {
-          const imgResponse = await fetch(url);
-          const buffer = await imgResponse.arrayBuffer();
-          return { base64: Buffer.from(buffer).toString('base64'), url };
+          const buffer = await replicateDownloadOutput(url);
+          return { base64: buffer.toString('base64'), url };
         } catch {
           return { url };
         }

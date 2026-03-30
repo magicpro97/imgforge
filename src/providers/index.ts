@@ -4,6 +4,7 @@ import { GeminiProvider } from './gemini.js';
 import { PollinationsProvider } from './pollinations.js';
 import { StabilityProvider } from './stability.js';
 import { ReplicateProvider } from './replicate.js';
+import { OpenRouterProvider } from './openrouter.js';
 
 export { ImageProvider } from './base.js';
 export { OpenAIProvider } from './openai.js';
@@ -11,6 +12,7 @@ export { GeminiProvider } from './gemini.js';
 export { PollinationsProvider } from './pollinations.js';
 export { StabilityProvider } from './stability.js';
 export { ReplicateProvider } from './replicate.js';
+export { OpenRouterProvider } from './openrouter.js';
 
 const providerRegistry = new Map<string, () => ImageProvider>([
   ['openai', () => new OpenAIProvider()],
@@ -18,6 +20,7 @@ const providerRegistry = new Map<string, () => ImageProvider>([
   ['pollinations', () => new PollinationsProvider()],
   ['stability', () => new StabilityProvider()],
   ['replicate', () => new ReplicateProvider()],
+  ['openrouter', () => new OpenRouterProvider()],
 ]);
 
 export function createProvider(name: string): ImageProvider {
