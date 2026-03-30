@@ -4,7 +4,7 @@ import { saveImages } from '../../core/output.js';
 import { addHistoryEntry } from '../../core/history.js';
 import { resolveRatio } from '../../core/ratios.js';
 import { applyPreset, getPresetNames, STYLE_PRESETS } from '../../core/presets.js';
-import { estimateCost } from '../../core/pricing.js';
+import { estimateCost, addCostEntry } from '../../core/pricing.js';
 import { getTemplate, renderTemplate } from '../../core/templates.js';
 import { openFile } from '../../core/opener.js';
 import type { ImageGenerationRequest } from '../../types/index.js';
@@ -167,6 +167,16 @@ export async function generateCommand(prompt: string, options: GenerateOptions):
           quality: request.quality || 'standard',
           outputFiles: saveResult.filePaths,
           elapsed: result.elapsed,
+          cost,
+        });
+      }
+
+      // Persist cost entry (independent of history trimming)
+      if (config.cost.trackingEnabled && cost > 0) {
+        addCostEntry({
+          provider: result.provider,
+          model: result.model,
+          count: request.count || 1,
           cost,
         });
       }

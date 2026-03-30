@@ -109,11 +109,19 @@ export class OpenAIProvider extends ImageProvider {
     const model = request.model || 'gpt-image-1';
 
     const formData = new FormData();
-    const imageBuffer = fs.readFileSync(request.inputImage);
-    formData.append('image', new Blob([imageBuffer]), 'image.png');
+    try {
+      const imageBuffer = fs.readFileSync(request.inputImage);
+      formData.append('image', new Blob([imageBuffer]), 'image.png');
+    } catch (err: any) {
+      throw new Error(`Failed to read image file: ${request.inputImage} (${err.message})`);
+    }
     if (request.mask) {
-      const maskBuffer = fs.readFileSync(request.mask);
-      formData.append('mask', new Blob([maskBuffer]), 'mask.png');
+      try {
+        const maskBuffer = fs.readFileSync(request.mask);
+        formData.append('mask', new Blob([maskBuffer]), 'mask.png');
+      } catch (err: any) {
+        throw new Error(`Failed to read mask file: ${request.mask} (${err.message})`);
+      }
     }
     formData.append('prompt', request.prompt);
     formData.append('model', model);
@@ -143,8 +151,12 @@ export class OpenAIProvider extends ImageProvider {
     const startTime = Date.now();
 
     const formData = new FormData();
-    const imageBuffer = fs.readFileSync(request.inputImage);
-    formData.append('image', new Blob([imageBuffer]), 'image.png');
+    try {
+      const imageBuffer = fs.readFileSync(request.inputImage);
+      formData.append('image', new Blob([imageBuffer]), 'image.png');
+    } catch (err: any) {
+      throw new Error(`Failed to read image file: ${request.inputImage} (${err.message})`);
+    }
     formData.append('model', 'dall-e-2');
     formData.append('n', String(Math.min(request.count || 4, 4)));
     formData.append('response_format', 'b64_json');

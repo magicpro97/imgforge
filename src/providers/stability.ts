@@ -119,8 +119,12 @@ export class StabilityProvider extends ImageProvider {
     const startTime = Date.now();
 
     const formData = new FormData();
-    const imageBuffer = fs.readFileSync(request.inputImage);
-    formData.append('image', new Blob([imageBuffer]), 'image.png');
+    try {
+      const imageBuffer = fs.readFileSync(request.inputImage);
+      formData.append('image', new Blob([imageBuffer]), 'image.png');
+    } catch (err: any) {
+      throw new Error(`Failed to read image file: ${request.inputImage} (${err.message})`);
+    }
     formData.append('prompt', request.prompt);
     if (request.negativePrompt) formData.append('negative_prompt', request.negativePrompt);
     if (request.strength !== undefined) formData.append('strength', String(request.strength));
@@ -150,8 +154,12 @@ export class StabilityProvider extends ImageProvider {
     const startTime = Date.now();
 
     const formData = new FormData();
-    const imageBuffer = fs.readFileSync(request.inputImage);
-    formData.append('image', new Blob([imageBuffer]), 'image.png');
+    try {
+      const imageBuffer = fs.readFileSync(request.inputImage);
+      formData.append('image', new Blob([imageBuffer]), 'image.png');
+    } catch (err: any) {
+      throw new Error(`Failed to read image file: ${request.inputImage} (${err.message})`);
+    }
     if (request.prompt) formData.append('prompt', request.prompt);
     formData.append('output_format', request.format || 'png');
     if (request.creativity !== undefined) formData.append('creativity', String(request.creativity));
@@ -184,8 +192,12 @@ export class StabilityProvider extends ImageProvider {
     const startTime = Date.now();
 
     const formData = new FormData();
-    const imageBuffer = fs.readFileSync(inputImage);
-    formData.append('image', new Blob([imageBuffer]), 'image.png');
+    try {
+      const imageBuffer = fs.readFileSync(inputImage);
+      formData.append('image', new Blob([imageBuffer]), 'image.png');
+    } catch (err: any) {
+      throw new Error(`Failed to read image file: ${inputImage} (${err.message})`);
+    }
     formData.append('output_format', 'png');
 
     const response = await fetch(`${this.baseUrl}/stable-image/edit/remove-background`, {

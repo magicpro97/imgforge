@@ -1,6 +1,5 @@
 import { Command } from 'commander';
-import { getHistory, clearHistory } from '../../core/history.js';
-import { getAllPricing } from '../../core/pricing.js';
+import { getAllPricing, getCostHistory, clearCosts } from '../../core/pricing.js';
 import { loadConfig, setConfigValue } from '../../core/config.js';
 
 export const costCommand = new Command('cost')
@@ -13,17 +12,17 @@ costCommand
   .option('--month <YYYY-MM>', 'Filter by month')
   .action(async (options: { month?: string }) => {
     const chalk = (await import('chalk')).default;
-    const entries = getHistory();
+    const costEntries = getCostHistory();
     const config = loadConfig();
 
     // Filter by month
-    let filtered = entries;
+    let filtered = costEntries;
     if (options.month) {
-      filtered = entries.filter(e => e.timestamp.startsWith(options.month!));
+      filtered = costEntries.filter(e => e.timestamp.startsWith(options.month!));
     } else {
       const now = new Date();
       const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      filtered = entries.filter(e => e.timestamp.startsWith(currentMonth));
+      filtered = costEntries.filter(e => e.timestamp.startsWith(currentMonth));
     }
 
     const totalCost = filtered.reduce((sum, e) => sum + (e.cost || 0), 0);
@@ -31,7 +30,7 @@ costCommand
 
     for (const e of filtered) {
       if (!byProvider[e.provider]) byProvider[e.provider] = { count: 0, cost: 0 };
-      byProvider[e.provider].count++;
+      byProvider[e.provider].count += e.count;
       byProvider[e.provider].cost += e.cost || 0;
     }
 
@@ -91,32 +90,32 @@ costCommand
   .action(async (file: string) => {
     const chalk = (await import('chalk')).default;
     const fs = await import('node:fs');
-    const entries = getHistory();
+    const costEntries = getCostHistory();
 
-    const csv = ['id,timestamp,provider,model,prompt,cost,elapsed_ms']
-      .concat(entries.map(e =>
-        `${e.id},${e.timestamp},${e.provider},${e.model},"${e.prompt.replace(/"/g, '""')}",${(e.cost || 0).toFixed(4)},${e.elapsed}`
+    const csv = ['id,timestamp,provider,model,count,cost']
+      .concat(costEntries.map(e =>
+        `${e.id},${e.timestamp},${e.provider},${e.model},${e.count},${e.cost.toFixed(4)}`
       ))
       .join('\n');
 
     fs.writeFileSync(file, csv, 'utf-8');
-    console.log(chalk.green(`  ✓ Exported ${entries.length} entries to ${file}`));
+    console.log(chalk.green(`  ✓ Exported ${costEntries.length} entries to ${file}`));
   });
 
 costCommand
   .command('reset')
-  .description('Reset cost tracking (clears history)')
+  .description('Reset cost tracking data')
   .action(async () => {
     const chalk = (await import('chalk')).default;
     const inquirer = (await import('inquirer')).default;
     const { confirm } = await inquirer.prompt([{
       type: 'confirm',
       name: 'confirm',
-      message: 'This will clear all history. Continue?',
+      message: 'This will clear all cost data. Continue?',
       default: false,
     }]);
     if (confirm) {
-      clearHistory();
-      console.log(chalk.green('  ✓ History and cost data cleared'));
+      clearCosts();
+      console.log(chalk.green('  ✓ Cost data cleared'));
     }
   });

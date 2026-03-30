@@ -1,3 +1,7 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { getConfigDir } from './config.js';
+
 // Cost pricing per image by provider and model
 const PRICING: Record<string, Record<string, number>> = {
   openai: {
@@ -57,7 +61,7 @@ export function estimateCost(
   // Special pricing for OpenAI HD/wide
   if (provider === 'openai' && model === 'dall-e-3') {
     const isHd = options?.quality === 'hd';
-    const isWide = (options?.width || 1024) !== (options?.height || 1024);
+    const isWide = (options?.width || 1024) > (options?.height || 1024);
     if (isHd && isWide) return PRICING.openai['dall-e-3-hd-wide'];
     if (isHd) return PRICING.openai['dall-e-3-hd'];
   }
@@ -67,4 +71,64 @@ export function estimateCost(
 
 export function getAllPricing(): Record<string, Record<string, number>> {
   return PRICING;
+}
+
+// --- Cost persistence ---
+
+export interface CostEntry {
+  id: string;
+  timestamp: string;
+  provider: string;
+  model: string;
+  count: number;
+  cost: number;
+}
+
+const COSTS_FILE = path.join(getConfigDir(), 'costs.json');
+
+function loadCosts(): CostEntry[] {
+  try {
+    if (!fs.existsSync(COSTS_FILE)) return [];
+    return JSON.parse(fs.readFileSync(COSTS_FILE, 'utf-8'));
+  } catch {
+    return [];
+  }
+}
+
+function saveCosts(entries: CostEntry[]): void {
+  const dir = path.dirname(COSTS_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(COSTS_FILE, JSON.stringify(entries, null, 2), 'utf-8');
+}
+
+export function addCostEntry(entry: Omit<CostEntry, 'id' | 'timestamp'>): CostEntry {
+  const fullEntry: CostEntry = {
+    id: `cost-${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    ...entry,
+  };
+  const entries = loadCosts();
+  entries.push(fullEntry);
+  saveCosts(entries);
+  return fullEntry;
+}
+
+export function getCostHistory(): CostEntry[] {
+  return loadCosts();
+}
+
+export function getCostSummary(): Record<string, number> {
+  const entries = loadCosts();
+  const summary: Record<string, number> = { total: 0 };
+  for (const entry of entries) {
+    summary[entry.provider] = (summary[entry.provider] ?? 0) + entry.cost;
+    summary.total += entry.cost;
+  }
+  return summary;
+}
+
+export function clearCosts(): void {
+  if (fs.existsSync(COSTS_FILE)) {
+    fs.unlinkSync(COSTS_FILE);
+  }
 }
