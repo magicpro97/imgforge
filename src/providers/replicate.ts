@@ -33,7 +33,7 @@ export class ReplicateProvider extends ImageProvider {
     if (!this.apiKey) throw new Error('Replicate API key not configured. Run: imgforge config set replicate.apiKey <key>');
 
     const startTime = Date.now();
-    const model = request.model || 'black-forest-labs/flux-1.1-pro';
+    const model = request.model || 'black-forest-labs/flux-schnell';
 
     const w = request.width || 1024;
     const h = request.height || 1024;
