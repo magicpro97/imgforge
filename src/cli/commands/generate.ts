@@ -7,6 +7,7 @@ import { applyPreset, getPresetNames, STYLE_PRESETS } from '../../core/presets.j
 import { estimateCost, addCostEntry } from '../../core/pricing.js';
 import { getTemplate, renderTemplate } from '../../core/templates.js';
 import { openFile } from '../../core/opener.js';
+import { loadBrandKit, brandKitToPrompt } from '../../core/brand.js';
 import type { ImageGenerationRequest } from '../../types/index.js';
 
 interface GenerateOptions {
@@ -27,6 +28,8 @@ interface GenerateOptions {
   open?: boolean;
   template?: string;
   var?: string[];
+  brandKit?: string;
+  variants?: string;
 }
 
 export async function generateCommand(prompt: string, options: GenerateOptions): Promise<void> {
@@ -60,6 +63,17 @@ export async function generateCommand(prompt: string, options: GenerateOptions):
     if (tmpl.height && !options.height) options.height = String(tmpl.height);
     if (tmpl.quality && !options.quality) options.quality = tmpl.quality;
     if (tmpl.negativePrompt && !options.negative) options.negative = tmpl.negativePrompt;
+  }
+
+  // Apply brand kit
+  if (options.brandKit) {
+    try {
+      const kit = loadBrandKit(options.brandKit);
+      prompt = brandKitToPrompt(kit) + ' ' + prompt;
+    } catch (err: any) {
+      console.error(chalk.red(`\n  ✗ ${err.message}\n`));
+      process.exit(1);
+    }
   }
 
   // Apply style preset
@@ -122,73 +136,155 @@ export async function generateCommand(prompt: string, options: GenerateOptions):
   console.log(chalk.dim(`  Prompt:   "${prompt.slice(0, 60)}${prompt.length > 60 ? '...' : ''}"`));
   console.log('');
 
-  const spinner = ora({ text: 'Generating image...', indent: 2 }).start();
+  const variantCount = options.variants ? parseInt(options.variants) : 1;
 
-  try {
-    const result = await provider.generate(request);
-    spinner.succeed(`Generated ${result.images.length} image(s) in ${(result.elapsed / 1000).toFixed(1)}s`);
-
-    if (result.images[0]?.revisedPrompt) {
-      console.log(chalk.dim(`  Revised prompt: "${result.images[0].revisedPrompt.slice(0, 80)}..."`));
+  if (variantCount > 1) {
+    // A/B variant generation
+    console.log(chalk.dim(`  Generating ${variantCount} A/B test variants...\n`));
+    const variantSuffixes: string[] = [
+      '',
+      ' Alternative style, different color palette',
+      ' Another creative interpretation, unique composition',
+    ];
+    for (let i = 4; i <= variantCount; i++) {
+      variantSuffixes.push(` Creative variation ${i}, distinct visual approach`);
     }
 
-    // Estimate cost
-    const cost = estimateCost(providerName, request.model || '', {
-      quality: request.quality,
-      width: request.width,
-      height: request.height,
-    }) * (request.count || 1);
-    result.cost = cost;
+    for (let v = 0; v < variantCount; v++) {
+      const variantPrompt = request.prompt + (variantSuffixes[v] || ` Creative variation ${v + 1}, distinct visual approach`);
+      const variantRequest = { ...request, prompt: variantPrompt };
+      const variantLabel = `_v${v + 1}`;
 
-    // Save images
-    if (options.save !== false) {
-      const saveResult = saveImages(result, options.output);
-      console.log('');
-      for (const fp of saveResult.filePaths) {
-        console.log(chalk.green(`  ✓ Saved: ${fp}`));
+      const spinner = ora({ text: `Generating variant ${v + 1}/${variantCount}...`, indent: 2 }).start();
+      try {
+        const result = await provider.generate(variantRequest);
+        spinner.succeed(`Variant ${v + 1} generated in ${(result.elapsed / 1000).toFixed(1)}s`);
+
+        const cost = estimateCost(providerName, request.model || '', {
+          quality: request.quality,
+          width: request.width,
+          height: request.height,
+        }) * (request.count || 1);
+        result.cost = cost;
+
+        if (options.save !== false) {
+          let variantOutput = options.output;
+          if (variantOutput) {
+            const { basename: bn, extname: en, dirname: dn, join: jn } = await import('node:path');
+            const ext = en(variantOutput);
+            const base = bn(variantOutput, ext);
+            variantOutput = jn(dn(variantOutput), `${base}${variantLabel}${ext}`);
+          }
+          const saveResult = saveImages(result, variantOutput);
+          for (const fp of saveResult.filePaths) {
+            console.log(chalk.green(`  ✓ Saved: ${fp}`));
+          }
+
+          if (options.open || config.autoOpen) {
+            for (const fp of saveResult.filePaths) {
+              openFile(fp);
+            }
+          }
+
+          if (config.history.enabled) {
+            addHistoryEntry({
+              provider: result.provider,
+              model: result.model,
+              prompt: variantPrompt,
+              negativePrompt: request.negativePrompt,
+              width: request.width!,
+              height: request.height!,
+              quality: request.quality || 'standard',
+              outputFiles: saveResult.filePaths,
+              elapsed: result.elapsed,
+              cost,
+            });
+          }
+
+          if (config.cost.trackingEnabled && cost > 0) {
+            addCostEntry({
+              provider: result.provider,
+              model: result.model,
+              count: request.count || 1,
+              cost,
+            });
+          }
+        }
+
+        if (cost > 0) {
+          console.log(chalk.dim(`  Cost: ~$${cost.toFixed(4)}`));
+        }
+      } catch (error: any) {
+        spinner.fail(`Variant ${v + 1} failed`);
+        console.error(chalk.red(`\n  ${error.message}\n`));
+      }
+    }
+    console.log('');
+  } else {
+    // Single generation (original flow)
+    const spinner = ora({ text: 'Generating image...', indent: 2 }).start();
+
+    try {
+      const result = await provider.generate(request);
+      spinner.succeed(`Generated ${result.images.length} image(s) in ${(result.elapsed / 1000).toFixed(1)}s`);
+
+      if (result.images[0]?.revisedPrompt) {
+        console.log(chalk.dim(`  Revised prompt: "${result.images[0].revisedPrompt.slice(0, 80)}..."`));
       }
 
-      // Auto-open
-      if (options.open || config.autoOpen) {
+      const cost = estimateCost(providerName, request.model || '', {
+        quality: request.quality,
+        width: request.width,
+        height: request.height,
+      }) * (request.count || 1);
+      result.cost = cost;
+
+      if (options.save !== false) {
+        const saveResult = saveImages(result, options.output);
+        console.log('');
         for (const fp of saveResult.filePaths) {
-          openFile(fp);
+          console.log(chalk.green(`  ✓ Saved: ${fp}`));
+        }
+
+        if (options.open || config.autoOpen) {
+          for (const fp of saveResult.filePaths) {
+            openFile(fp);
+          }
+        }
+
+        if (config.history.enabled) {
+          addHistoryEntry({
+            provider: result.provider,
+            model: result.model,
+            prompt,
+            negativePrompt: request.negativePrompt,
+            width: request.width!,
+            height: request.height!,
+            quality: request.quality || 'standard',
+            outputFiles: saveResult.filePaths,
+            elapsed: result.elapsed,
+            cost,
+          });
+        }
+
+        if (config.cost.trackingEnabled && cost > 0) {
+          addCostEntry({
+            provider: result.provider,
+            model: result.model,
+            count: request.count || 1,
+            cost,
+          });
         }
       }
 
-      // Add to history
-      if (config.history.enabled) {
-        addHistoryEntry({
-          provider: result.provider,
-          model: result.model,
-          prompt,
-          negativePrompt: request.negativePrompt,
-          width: request.width!,
-          height: request.height!,
-          quality: request.quality || 'standard',
-          outputFiles: saveResult.filePaths,
-          elapsed: result.elapsed,
-          cost,
-        });
+      if (cost > 0) {
+        console.log(chalk.dim(`  Cost: ~$${cost.toFixed(4)}`));
       }
-
-      // Persist cost entry (independent of history trimming)
-      if (config.cost.trackingEnabled && cost > 0) {
-        addCostEntry({
-          provider: result.provider,
-          model: result.model,
-          count: request.count || 1,
-          cost,
-        });
-      }
+      console.log('');
+    } catch (error: any) {
+      spinner.fail('Generation failed');
+      console.error(chalk.red(`\n  ${error.message}\n`));
+      process.exit(1);
     }
-
-    if (cost > 0) {
-      console.log(chalk.dim(`  Cost: ~$${cost.toFixed(4)}`));
-    }
-    console.log('');
-  } catch (error: any) {
-    spinner.fail('Generation failed');
-    console.error(chalk.red(`\n  ${error.message}\n`));
-    process.exit(1);
   }
 }

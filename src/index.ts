@@ -47,6 +47,8 @@ program
   .option('--enhance', 'Enhance prompt with quality keywords')
   .option('--open', 'Open image after generation')
   .option('--no-save', 'Do not save to disk')
+  .option('--brand-kit <path>', 'Load brand kit JSON for consistent styling')
+  .option('--variants <count>', 'Generate multiple A/B test variants')
   .action(generateCommand);
 
 // Edit (img2img)
