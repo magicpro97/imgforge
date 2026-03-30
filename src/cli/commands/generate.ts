@@ -30,6 +30,7 @@ interface GenerateOptions {
   var?: string[];
   brandKit?: string;
   variants?: string;
+  dryRun?: boolean;
 }
 
 export async function generateCommand(prompt: string, options: GenerateOptions): Promise<void> {
@@ -135,6 +136,18 @@ export async function generateCommand(prompt: string, options: GenerateOptions):
   if (presetName) console.log(chalk.dim(`  Preset:   ${presetName}`));
   console.log(chalk.dim(`  Prompt:   "${prompt.slice(0, 60)}${prompt.length > 60 ? '...' : ''}"`));
   console.log('');
+
+  // Dry run — show cost estimate without generating
+  if (options.dryRun) {
+    const cost = estimateCost(providerName, request.model || '', {
+      quality: request.quality,
+      width: request.width,
+      height: request.height,
+    }) * (request.count || 1);
+    console.log(chalk.cyan(`  💰 Estimated cost: ~$${cost.toFixed(4)}`));
+    console.log(chalk.dim('  (dry run — no API call made)\n'));
+    return;
+  }
 
   const variantCount = options.variants ? parseInt(options.variants) : 1;
 

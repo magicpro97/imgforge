@@ -49,6 +49,7 @@ program
   .option('--no-save', 'Do not save to disk')
   .option('--brand-kit <path>', 'Load brand kit JSON for consistent styling')
   .option('--variants <count>', 'Generate multiple A/B test variants')
+  .option('--dry-run', 'Show estimated cost without generating')
   .action(generateCommand);
 
 // Edit (img2img)

@@ -38,7 +38,7 @@ const PRICING: Record<string, Record<string, number>> = {
     'black-forest-labs/flux-1.1-pro': 0.040,
     'black-forest-labs/flux-schnell': 0.003,
     'stability-ai/sdxl': 0.010,
-    '_default': 0.040,
+    '_default': 0.003,
   },
   pollinations: {
     '_default': 0,
